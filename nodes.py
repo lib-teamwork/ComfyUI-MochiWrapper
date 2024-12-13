@@ -23,7 +23,7 @@ except:
     pass
 
 from configs.config import get_juicefs_path
-from configs.node_fields import get_field_pre_values, MochiModel_Mapping, VAE_MAPPINGS
+from configs.node_fields import get_field_pre_values, MochiModel_Mapping, MochiVAE_Mapping
 
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -163,9 +163,9 @@ class DownloadAndLoadMochiModel:
             model_path = get_juicefs_path(MochiModel_Mapping[model])
         else:
             raise ValueError(str(model) + " does not exist in mapping")
-        vae_path = VAE_MAPPINGS.get(vae, "")
+        vae_path = MochiVAE_Mapping.get(vae, "")
         if vae_path:
-            vae_path = get_juicefs_path(VAE_MAPPINGS[vae])
+            vae_path = get_juicefs_path(MochiVAE_Mapping[vae])
         else:
             raise ValueError(str(vae) + " does not exist in mapping")
 
