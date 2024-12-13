@@ -22,6 +22,10 @@ except:
     is_accelerate_available = False
     pass
 
+from configs.config import get_juicefs_path
+from configs.node_fields import get_field_pre_values, MochiModel_Mapping, VAE_MAPPINGS
+
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 def linear_quadratic_schedule(num_steps, threshold_noise, linear_steps=None):
@@ -125,33 +129,45 @@ class DownloadAndLoadMochiModel:
             vae_dtype = dtype
 
         # Transformer model
-        model_download_path = os.path.join(folder_paths.models_dir, 'diffusion_models', 'mochi')
-        model_path = os.path.join(model_download_path, model)
+        # model_download_path = os.path.join(folder_paths.models_dir, 'diffusion_models', 'mochi')
+        # model_path = os.path.join(model_download_path, model)
    
-        repo_id = "kijai/Mochi_preview_comfy"
+        # repo_id = "kijai/Mochi_preview_comfy"
         
-        if not os.path.exists(model_path):
-            log.info(f"Downloading mochi model to: {model_path}")
-            from huggingface_hub import snapshot_download
-            snapshot_download(
-                repo_id=repo_id,
-                allow_patterns=[f"*{model}*"],
-                local_dir=model_download_path,
-                local_dir_use_symlinks=False,
-            )
+        # if not os.path.exists(model_path):
+        #     log.info(f"Downloading mochi model to: {model_path}")
+        #     from huggingface_hub import snapshot_download
+        #     snapshot_download(
+        #         repo_id=repo_id,
+        #         allow_patterns=[f"*{model}*"],
+        #         local_dir=model_download_path,
+        #         local_dir_use_symlinks=False,
+        #     )
         # VAE
-        vae_download_path = os.path.join(folder_paths.models_dir, 'vae', 'mochi')
-        vae_path = os.path.join(vae_download_path, vae)
+        # vae_download_path = os.path.join(folder_paths.models_dir, 'vae', 'mochi')
+        # vae_path = os.path.join(vae_download_path, vae)
 
-        if not os.path.exists(vae_path):
-            log.info(f"Downloading mochi VAE to: {vae_path}")
-            from huggingface_hub import snapshot_download
-            snapshot_download(
-                repo_id=repo_id,
-                allow_patterns=[f"*{vae}*"],
-                local_dir=vae_download_path,
-                local_dir_use_symlinks=False,
-            )
+        # if not os.path.exists(vae_path):
+        #     log.info(f"Downloading mochi VAE to: {vae_path}")
+        #     from huggingface_hub import snapshot_download
+        #     snapshot_download(
+        #         repo_id=repo_id,
+        #         allow_patterns=[f"*{vae}*"],
+        #         local_dir=vae_download_path,
+        #         local_dir_use_symlinks=False,
+        #     )
+
+        #liblib model adapter
+        model_path = MochiModel_Mapping.get(model, "")
+        if model_path:
+            model_path = get_juicefs_path(MochiModel_Mapping[model])
+        else:
+            raise ValueError(str(model) + " does not exist in mapping")
+        vae_path = VAE_MAPPINGS.get(vae, "")
+        if vae_path:
+            vae_path = get_juicefs_path(VAE_MAPPINGS[vae])
+        else:
+            raise ValueError(str(vae) + " does not exist in mapping")
 
         model = T2VSynthMochiModel(
             device=device,
@@ -196,7 +212,8 @@ class MochiModelLoader:
     def INPUT_TYPES(s):
         return {
             "required": { 
-                "model_name": (folder_paths.get_filename_list("diffusion_models"), {"tooltip": "The name of the checkpoint (model) to load.",}),
+                #"model_name": (folder_paths.get_filename_list("diffusion_models"), {"tooltip": "The name of the checkpoint (model) to load.",}),
+                "model_name": (get_field_pre_values("MochiModelLoader", "model"), {"tooltip": "The name of the checkpoint (model) to load.",}),
                 "precision": (["fp8_e4m3fn","fp8_e4m3fn_fast","fp16", "fp32", "bf16"], {"default": "fp8_e4m3fn"}),
                 "attention_mode": (["sdpa","flash_attn","sage_attn", "comfy"],),
             },
@@ -220,7 +237,8 @@ class MochiModelLoader:
         mm.soft_empty_cache()
 
         dtype = {"fp8_e4m3fn": torch.float8_e4m3fn, "fp8_e4m3fn_fast": torch.float8_e4m3fn, "bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
-        model_path = folder_paths.get_full_path_or_raise("diffusion_models", model_name)
+        #model_path = folder_paths.get_full_path_or_raise("diffusion_models", model_name)
+        model_path = model_name
 
         model = T2VSynthMochiModel(
             device=device,
@@ -275,7 +293,8 @@ class MochiVAELoader:
     def INPUT_TYPES(s):
         return {
             "required": { 
-                "model_name": (folder_paths.get_filename_list("vae"), {"tooltip": "The name of the checkpoint (vae) to load."}),
+                #"model_name": (folder_paths.get_filename_list("vae"), {"tooltip": "The name of the checkpoint (vae) to load."}),
+                "model_name": (get_field_pre_values("MochiVAELoader", "model_name"), {"tooltip": "The name of the checkpoint (vae) to load."}),
             },
             "optional": {
                 "torch_compile_args": ("MOCHICOMPILEARGS", {"tooltip": "Optional torch.compile arguments",}),
@@ -296,7 +315,8 @@ class MochiVAELoader:
 
         dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
 
-        vae_path = folder_paths.get_full_path_or_raise("vae", model_name)
+        #vae_path = folder_paths.get_full_path_or_raise("vae", model_name)
+        vae_path = model_name
 
         with (init_empty_weights() if is_accelerate_available else nullcontext()):
             vae = Decoder(
@@ -345,7 +365,8 @@ class MochiVAEEncoderLoader:
     def INPUT_TYPES(s):
         return {
             "required": { 
-                "model_name": (folder_paths.get_filename_list("vae"), {"tooltip": "The name of the checkpoint (vae) to load."}),
+                #"model_name": (folder_paths.get_filename_list("vae"), {"tooltip": "The name of the checkpoint (vae) to load."}),
+                "model_name": (get_field_pre_values("MochiVAEEncoderLoader", "model_name"), {"tooltip": "The name of the checkpoint (vae) to load."}),
             },
             "optional": {
                 "torch_compile_args": ("MOCHICOMPILEARGS", {"tooltip": "Optional torch.compile arguments",}),
@@ -375,7 +396,8 @@ class MochiVAEEncoderLoader:
                     padding_mode="replicate"
                 )
 
-        vae_path = folder_paths.get_full_path_or_raise("vae", model_name)
+        #vae_path = folder_paths.get_full_path_or_raise("vae", model_name)
+        vae_path = model_name
         
 
         # Create VAE encoder
